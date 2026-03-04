@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Team Org Chart</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f0f2f8;
+    --surface: #ffffff;
+    --surface2: #e8ebf5;
+    --border: #d0d5e8;
+    --text: #1e2240;
+    --text-muted: #7b82a8;
+    --accent: #4f7cff;
+    --accent-glow: rgba(79,124,255,0.12);
+    --red: #e8294a;
+    --red-bg: rgba(232,41,74,0.08);
+    --red-border: rgba(232,41,74,0.35);
+    --pink: #1a7a4a;
+    --pink-bg: rgba(34,180,100,0.1);
+    --pink-border: rgba(26,122,74,0.45);
+    --connector: #8892bb;
+    --node-w: 130px;
+    --node-h: 52px;
+    --gap-x: 18px;
+    --gap-y: 48px;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    background: rgba(240,242,248,0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 12px 24px;
+  }
+
+  header h1 {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--text);
+  }
+
+  .legend {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+  }
+
+  .legend-dot.manager { background: var(--red); }
+  .legend-dot.techlead { background: #22b464; }
+  .legend-dot.regular { background: var(--accent); border: 1px solid rgba(79,124,255,0.5); }
+
+  .controls {
+    display: flex;
+    gap: 8px;
+  }
+
+  button {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: 'DM Mono', monospace;
+    transition: all 0.15s;
+  }
+
+  button:hover {
+    background: var(--accent-glow);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  #canvas-wrap {
+    position: fixed;
+    top: 53px; left: 0; right: 0; bottom: 0;
+    overflow: hidden;
+    cursor: grab;
+  }
+
+  #canvas-wrap.dragging { cursor: grabbing; }
+
+  #scene {
+    position: absolute;
+    transform-origin: 0 0;
+  }
+
+  #scene svg.connectors {
+    position: absolute;
+    top: 0; left: 0;
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  .node {
+    position: absolute;
+    width: var(--node-w);
+    height: var(--node-h);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+    padding: 6px 8px;
+    text-align: center;
+  }
+
+  .node:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    border-color: var(--accent);
+    z-index: 10;
+  }
+
+  .node.manager {
+    background: var(--red-bg);
+    border-color: var(--red-border);
+  }
+
+  .node.manager:hover {
+    border-color: var(--red);
+    box-shadow: 0 8px 24px rgba(255,77,109,0.2);
+  }
+
+  .node.techlead {
+    background: var(--pink-bg);
+    border-color: var(--pink-border);
+  }
+
+  .node.techlead:hover {
+    border-color: var(--pink);
+    box-shadow: 0 8px 24px rgba(255,179,198,0.2);
+  }
+
+  .node-name {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 112px;
+  }
+
+  .node.manager .node-name { color: #c0122e; }
+  .node.manager .node-role { color: rgba(192,18,46,0.7); }
+
+  .node.techlead .node-name { color: var(--pink); }
+  .node.techlead .node-role { color: rgba(26,122,74,0.75); }
+
+  .node-role {
+    font-size: 9.5px;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 112px;
+  }
+
+  .node-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    width: 10px;
+    height: 10px;
+    background: var(--red);
+    border-radius: 50%;
+    border: 2px solid var(--bg);
+  }
+
+  /* Tooltip */
+  #tooltip {
+    position: fixed;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 200;
+    display: none;
+    max-width: 200px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  }
+
+  #tooltip .tt-name {
+    font-weight: 600;
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+
+  #tooltip .tt-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    color: var(--text-muted);
+    font-size: 11px;
+    margin-top: 2px;
+  }
+
+  #tooltip .tt-val { color: var(--text); }
+
+  path.connector {
+    fill: none;
+    stroke: var(--connector);
+    stroke-width: 2;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Team Org Chart</h1>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot manager"></div> Function Manager</div>
+    <div class="legend-item"><div class="legend-dot techlead"></div> Tech Lead</div>
+    <div class="legend-item"><div class="legend-dot regular"></div> Team Member</div>
+  </div>
+  <div class="controls">
+    <button id="btn-fit">Fit View</button>
+    <button id="btn-in">＋ Zoom</button>
+    <button id="btn-out">－ Zoom</button>
+  </div>
+</header>
+
+<div id="canvas-wrap">
+  <div id="scene">
+    <svg class="connectors" id="svg-lines"></svg>
+    <div id="canvas"></div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+const MANAGERS = new Set(['Russ','Angela','Grace Chen','Delphine','Chris','Hamish','Yu-Tang','Jessie']);
+const TECH_LEADS = new Set(['YY','Jocelin Ho','Landice','Weihang','Jaime','Maso','Justin','Eason']);
+
+const RAW = [
+  {id:1,name:'John',coach:null,fn:'Other',effort:'Mixed'},
+  {id:2,name:'Jaime',coach:'John',fn:'Dev (Frontend)',effort:'Explore'},
+  {id:4,name:'Joanne',coach:'John',fn:'Visual Design',effort:'Mixed'},
+  {id:5,name:'Ching-Mei',coach:'John',fn:'Other',effort:'Mixed'},
+  {id:7,name:'YY',coach:'Russ',fn:'Dev (iOS)',effort:'PicCollage'},
+  {id:12,name:'Mica',coach:'John',fn:'Other',effort:'Company'},
+  {id:21,name:'Angela',coach:'John',fn:'Product Management',effort:'PicCollage'},
+  {id:79,name:'Way',coach:'Chris',fn:'Product Design',effort:'PicCollage'},
+  {id:82,name:'Maso',coach:'Russ',fn:'MLAD',effort:'Mixed'},
+  {id:94,name:'Chris',coach:'John',fn:'Product Design',effort:'PicCollage'},
+  {id:127,name:'Simon',coach:'Russ',fn:'Dev (iOS)',effort:'PicCollage'},
+  {id:128,name:'Christine Chen',coach:'Hamish',fn:'Users',effort:'PicCollage'},
+  {id:133,name:'Maggie',coach:'Angela',fn:'Product Management',effort:'PicCollage'},
+  {id:136,name:'Raymond',coach:'Jocelin Ho',fn:'Dev (iOS)',effort:'Explore'},
+  {id:148,name:'Grace Kuo',coach:'Irene',fn:'Operations',effort:'Company'},
+  {id:158,name:'Yanbin',coach:'Landice',fn:'Dev (Android)',effort:'PicCollage'},
+  {id:161,name:'Jessie',coach:'John',fn:'Operations',effort:'Company'},
+  {id:167,name:'Russ',coach:'John',fn:'Engineering',effort:'Mixed'},
+  {id:168,name:'Minnie',coach:'Amelia',fn:'Marketing',effort:'PicCollage'},
+  {id:173,name:'Amelia',coach:'Grace Chen',fn:'Marketing',effort:'PicCollage'},
+  {id:176,name:'Nichele',coach:'Grace Chen',fn:'Marketing',effort:'PicCollage'},
+  {id:177,name:'CJ',coach:'Liyu',fn:'Product Management',effort:'PicCollage'},
+  {id:180,name:'Kobe',coach:'Mica',fn:'Operations',effort:'Company'},
+  {id:185,name:'Jo',coach:'YY',fn:'Dev (iOS)',effort:'PicCollage'},
+  {id:186,name:'Alex',coach:'Maggie',fn:'Product Management',effort:'PicCollage'},
+  {id:188,name:'JJ',coach:'Way',fn:'Product Design',effort:'Explore'},
+  {id:191,name:'Tinya',coach:'Way',fn:'Product Design',effort:'Explore'},
+  {id:193,name:'Judy',coach:'Mica',fn:'Operations',effort:'Company'},
+  {id:195,name:'YC',coach:'Maso',fn:'MLAD',effort:'Explore'},
+  {id:196,name:'Palm',coach:'Chris',fn:'Product Design',effort:'Explore'},
+  {id:198,name:'Landice',coach:'Russ',fn:'Dev (Android)',effort:'PicCollage'},
+  {id:208,name:'Emily',coach:'Chris',fn:'Product Design',effort:'PicCollage'},
+  {id:209,name:'Nina',coach:'Delphine',fn:'Visual Design',effort:'PicCollage'},
+  {id:214,name:'James',coach:'Weihang',fn:'Dev (Backend)',effort:'PicCollage'},
+  {id:224,name:'Althea',coach:'Amelia',fn:'Marketing',effort:'PicCollage'},
+  {id:226,name:'Weihang',coach:'Russ',fn:'Dev (Backend)',effort:'PicCollage'},
+  {id:229,name:'Brad',coach:'Russ',fn:'MLAD',effort:'PicCollage'},
+  {id:230,name:'Jude',coach:'Judy',fn:'Operations',effort:'Company'},
+  {id:231,name:'Katherine',coach:'Chris',fn:'Product Design',effort:'PicCollage'},
+  {id:232,name:'Amy',coach:'Angela',fn:'Product Management',effort:'PicCollage'},
+  {id:237,name:'Justin',coach:'Jocelin Ho',fn:'Dev (iOS)',effort:'Explore'},
+  {id:240,name:'Katie',coach:null,fn:'Visual Design',effort:'PicCollage'},
+  {id:243,name:'Ting-Kai',coach:'Jaime',fn:'Dev (Frontend)',effort:'Explore'},
+  {id:245,name:'Ana',coach:'Amelia',fn:'Marketing',effort:'PicCollage'},
+  {id:246,name:'Naomi',coach:null,fn:'Visual Design',effort:'PicCollage'},
+  {id:247,name:'Eason',coach:'Russ',fn:'Dev (QA)',effort:'PicCollage'},
+  {id:249,name:'Andy Lee',coach:'Grace Chen',fn:'Marketing',effort:'PicCollage'},
+  {id:251,name:'Phoebe',coach:'Ellen',fn:'Operations',effort:'Company'},
+  {id:253,name:'Sherlyn',coach:'Delphine',fn:'Visual Design',effort:'PicCollage'},
+  {id:254,name:'Sandra',coach:'Hamish',fn:'Users',effort:'Explore'},
+  {id:256,name:'Cindy Wang',coach:null,fn:'Product Management',effort:'Mixed'},
+  {id:257,name:'Laurence',coach:'Grace Kuo',fn:'Operations',effort:'Company'},
+  {id:259,name:'Aaron Chiu',coach:'Eason',fn:'Dev (QA)',effort:'PicCollage'},
+  {id:263,name:'Winnie',coach:null,fn:'Visual Design',effort:'PicCollage'},
+  {id:265,name:'Aaron Ni',coach:'YY',fn:'Dev (iOS)',effort:'PicCollage'},
+  {id:266,name:'Morgan',coach:'Chris',fn:'Product Design',effort:'PicCollage'},
+  {id:267,name:'Alice',coach:'Grace Chen',fn:'Marketing',effort:'Explore'},
+  {id:270,name:'Zalman',coach:'Maggie',fn:'Product Management',effort:'PicCollage'},
+  {id:273,name:'Grace Yen',coach:'CJ',fn:'Users',effort:'PicCollage'},
+  {id:275,name:'Liyu',coach:'Angela',fn:'Product Management',effort:'PicCollage'},
+  {id:277,name:'Kelsy',coach:'Yichen',fn:'Users',effort:'PicCollage'},
+  {id:278,name:'Anny',coach:'Russ',fn:'MLAD',effort:'PicCollage'},
+  {id:281,name:'Soli',coach:'Delphine',fn:'Visual Design',effort:'PicCollage'},
+  {id:282,name:'Messi',coach:'Weihang',fn:'Dev (Frontend)',effort:'PicCollage'},
+  {id:283,name:'Christine Lin',coach:'Rick',fn:'Operations',effort:'Company'},
+  {id:284,name:'Sonia',coach:'Delphine',fn:'Visual Design',effort:'Company'},
+  {id:290,name:'Vivi',coach:'Russ',fn:'Dev (Frontend)',effort:'PicCollage'},
+  {id:291,name:'Ouyang',coach:'Aaron Ni',fn:'Dev (iOS)',effort:'PicCollage'},
+  {id:294,name:'Tim',coach:'Yanbin',fn:'Dev (Android)',effort:'PicCollage'},
+  {id:295,name:'Nana',coach:'Liyu',fn:'Product Management',effort:'PicCollage'},
+  {id:296,name:'Cersei',coach:'Grace Kuo',fn:'Operations',effort:'Company'},
+  {id:299,name:'Devin',coach:'Jocelin Ho',fn:'Dev (iOS)',effort:'Explore'},
+  {id:300,name:'Vivienne',coach:'Justin',fn:'Dev (IVP)',effort:'Explore'},
+  {id:301,name:'Patrik',coach:'Yanbin',fn:'Dev (Android)',effort:'Explore'},
+  {id:304,name:'Charles Tseng',coach:'Yu-Tang',fn:'Product Management',effort:'Explore'},
+  {id:305,name:'Lapor',coach:'Laurence',fn:'Dev (Frontend)',effort:'Explore'},
+  {id:307,name:'Yu-Tang',coach:'John',fn:'Product Management',effort:'Explore'},
+  {id:308,name:'Filipe',coach:'John',fn:'Product Management',effort:'Mixed'},
+  {id:309,name:'Kerwin',coach:'Way',fn:'Product Design',effort:'PicCollage'},
+  {id:312,name:'Delphine',coach:'Chris',fn:'Visual Design',effort:'PicCollage'},
+  {id:314,name:'Shannon',coach:'Maso',fn:'MLAD',effort:'Explore'},
+  {id:316,name:'Hamish',coach:'Angela',fn:'Users',effort:'PicCollage'},
+  {id:320,name:'Vivian',coach:'Romeo',fn:'Marketing',effort:'Explore'},
+  {id:322,name:'Anna',coach:'Nichele',fn:'Marketing',effort:'PicCollage'},
+  {id:323,name:'Lee Heng',coach:'Ting-Kai',fn:'Dev (Frontend)',effort:'PicCollage'},
+  {id:324,name:'Daphne',coach:'Amelia',fn:'Marketing',effort:'PicCollage'},
+  {id:325,name:'Peter',coach:'YY',fn:'Dev (iOS)',effort:'PicCollage'},
+  {id:329,name:'Keke',coach:'Jocelin Ho',fn:'Dev (iOS)',effort:'Explore'},
+  {id:334,name:'Rina',coach:'Justin',fn:'Dev (IVP)',effort:'Explore'},
+  {id:335,name:'Grace Chen',coach:'John',fn:'Marketing',effort:'Mixed'},
+  {id:337,name:'Yuji Wong',coach:'Landice',fn:'Dev (Android)',effort:'PicCollage'},
+  {id:339,name:'Kelvin',coach:'Way',fn:'Product Design',effort:'Explore'},
+  {id:342,name:'Fumi',coach:'James',fn:'Dev (Backend)',effort:'PicCollage'},
+  {id:346,name:'Mami',coach:null,fn:'Users',effort:'PicCollage'},
+  {id:347,name:'Rick',coach:'Jessie',fn:'Operations',effort:'Company'},
+  {id:349,name:'Romeo',coach:'Andy Lee',fn:'Marketing',effort:'Explore'},
+  {id:354,name:'Tina',coach:'Daphne',fn:'Marketing',effort:'PicCollage'},
+  {id:357,name:'Jocelyn',coach:'Nichele',fn:'Marketing',effort:'PicCollage'},
+  {id:359,name:'Lila',coach:'CJ',fn:'Users',effort:'PicCollage'},
+  {id:362,name:'Anna Lasko',coach:'Alice',fn:'Marketing',effort:'Explore'},
+  {id:363,name:'Jocelin Ho',coach:'Russ',fn:'Dev (iOS)',effort:'Explore'},
+  {id:364,name:'Ameily Chang',coach:'Soli',fn:'Visual Design',effort:'PicCollage'},
+  {id:366,name:'Angela Wu',coach:'Christine Chen',fn:'Users',effort:'PicCollage'},
+  {id:367,name:'Elisabeth McNeill',coach:'Sandra',fn:'Users',effort:'Explore'},
+  {id:369,name:'Genie',coach:'Aaron Chiu',fn:'Dev (QA)',effort:'PicCollage'},
+  {id:370,name:'Jose',coach:'Andy Lee',fn:'Marketing',effort:'PicCollage'},
+  {id:371,name:'Alice Lin',coach:'Anny',fn:'MLAD',effort:'Explore'},
+  {id:372,name:'Wen',coach:'JJ',fn:'Visual Design',effort:'PicCollage'},
+  {id:373,name:'Amelia Hu',coach:'Christine Chen',fn:'Users',effort:'PicCollage'},
+  {id:375,name:'Lawrence Chou',coach:'Weihang',fn:'Dev (Backend)',effort:'PicCollage'},
+  {id:376,name:'Ashley Hsu',coach:'Althea',fn:'Marketing',effort:'PicCollage'},
+  {id:377,name:'Jeff Chang',coach:'Sherlyn',fn:'Visual Design',effort:'PicCollage'},
+  {id:378,name:'Phoebe Zheng',coach:null,fn:'Operations (Tester)',effort:'Company'},
+  {id:380,name:'Yichen',coach:'Hamish',fn:'Users',effort:'PicCollage'},
+  {id:382,name:'Ellen',coach:'Jessie',fn:'Operations',effort:'Company'},
+  {id:385,name:'Sophia',coach:'Judy',fn:'Operations',effort:'Company'},
+  {id:388,name:'Roberto',coach:null,fn:'Operations (Tester)',effort:'Company'},
+  {id:389,name:'Jack Chen',coach:'Anny',fn:'MLAD',effort:'Explore'},
+  {id:390,name:'Colby',coach:'Laurence',fn:'Operations',effort:'Company'},
+  {id:391,name:'Tony',coach:'Yu-Tang',fn:'Product Management',effort:'Explore'},
+  {id:392,name:'Ann',coach:'Ameily Chang',fn:'Visual Design',effort:'PicCollage'},
+  {id:393,name:'Heather',coach:null,fn:'Operations (Tester)',effort:'Company'},
+  {id:394,name:'Lia',coach:'Morgan',fn:'Product Design',effort:'PicCollage'},
+  {id:395,name:'Annie',coach:'Nichele',fn:'Marketing',effort:'PicCollage'},
+  {id:396,name:'Irene',coach:'Jessie',fn:'Operations',effort:'Company'},
+  {id:397,name:'Jimmy',coach:null,fn:'Operations',effort:'Company'},
+  {id:398,name:'Chun-Wei',coach:'Brad',fn:'MLAD',effort:'PicCollage'},
+  {id:399,name:'Oscar',coach:'Tinya',fn:'Product Design',effort:'Explore'},
+  {id:400,name:'Maggie Chu',coach:'Yu-Tang',fn:'Product Management',effort:'Explore'},
+  {id:401,name:'Cindy Yeh',coach:null,fn:'Operations (Tester)',effort:'Company'},
+];
+
+// Build name→node map
+const byName = {};
+RAW.forEach(r => byName[r.name] = r);
+
+// Build children map
+const children = {};
+RAW.forEach(r => {
+  if (!children[r.name]) children[r.name] = [];
+});
+RAW.forEach(r => {
+  if (r.coach && byName[r.coach]) {
+    children[r.coach].push(r.name);
+  }
+});
+
+// Sort children to group related functions together
+// Priority order for function grouping (lower = left side)
+function fnPriority(name, parent) {
+  const node = byName[name];
+  if (!node) return 99;
+  const fn = node.fn || '';
+
+  // Under Russ: explicit left-to-right order
+  // Jocelin (leftmost) → YY → Landice → Weihang → Eason → Maso → Anny → Brad → Simon → Vivi (rightmost)
+  if (parent === 'Russ') {
+    if (name === 'Jocelin Ho')   return 0;
+    if (name === 'YY')           return 1;
+    if (name === 'Landice')      return 2;
+    if (name === 'Weihang')      return 3;
+    if (name === 'Eason')        return 4;
+    if (name === 'Maso')         return 5;
+    if (name === 'Anny')         return 6;
+    if (name === 'Brad')         return 7;
+    if (name === 'Simon')        return 8;
+    if (name === 'Vivi')         return 99; // very right
+    return 50;
+  }
+
+  // Under John: explicit left-to-right order
+  // Grace Chen (very left) → Angela → Filipe → Chris → Yu-Tang → Russ → Jaime → Joanne → Ching-Mei → ... → Jessie (very right)
+  if (parent === 'John') {
+    if (name === 'Grace Chen')   return 0;
+    if (name === 'Angela')       return 1;
+    if (name === 'Filipe')       return 2;
+    if (name === 'Chris')        return 3;
+    if (name === 'Yu-Tang')      return 4;
+    if (fn === 'Engineering')    return 5;  // Russ
+    if (fn.startsWith('Dev'))    return 6;  // Jaime
+    if (name === 'Joanne')       return 7;  // next to Jaime
+    if (name === 'Ching-Mei')    return 8;  // next to Joanne
+    if (fn === 'Other')          return 9;
+    if (fn === 'Operations' && name !== 'Jessie') return 10;
+    if (name === 'Jessie')       return 99; // very right
+    return 50;
+  }
+
+  // Under Chris: Delphine (very left) → other non-Way → Way (very right)
+  if (parent === 'Chris') {
+    if (name === 'Delphine')     return 0;  // very left
+    if (name === 'Way')          return 99; // very right
+    return 5; // everyone else in the middle
+  }
+
+  // General priority (lower = left)
+  if (fn === 'Engineering')        return 0;  // Russ
+  if (fn.startsWith('Dev'))        return 1;  // Jaime (Frontend) adjacent to Russ
+  if (fn === 'MLAD')               return 2;
+  if (fn === 'Product Management') return 3;
+  if (fn === 'Product Design')     return 4;
+  if (fn === 'Visual Design')      return 5;
+  if (fn === 'Marketing')          return 6;
+  if (fn === 'Users')              return 7;
+  if (fn === 'Operations')         return 8;
+  return 9;
+}
+
+Object.keys(children).forEach(parent => {
+  children[parent].sort((a, b) => fnPriority(a, parent) - fnPriority(b, parent));
+});
+
+// Layout: recursive Reingold-Tilford-like
+const NW = 130, NH = 52, GAP_X = 18, GAP_Y = 56;
+
+function subtreeWidth(name) {
+  const kids = children[name] || [];
+  if (kids.length === 0) return NW;
+  const totalKids = kids.reduce((s, k) => s + subtreeWidth(k), 0) + GAP_X * (kids.length - 1);
+  return Math.max(NW, totalKids);
+}
+
+const positions = {};
+function layout(name, x, y) {
+  const kids = children[name] || [];
+  const sw = subtreeWidth(name);
+  positions[name] = { x: x + sw / 2 - NW / 2, y };
+  if (kids.length === 0) return;
+  let cx = x;
+  kids.forEach(k => {
+    const ksw = subtreeWidth(k);
+    layout(k, cx, y + NH + GAP_Y);
+    cx += ksw + GAP_X;
+  });
+}
+
+// Find roots (coach is null OR coach not in byName)
+const roots = RAW.filter(r => !r.coach || !byName[r.coach]).map(r => r.name);
+
+// Place roots side by side
+let rx = 0;
+roots.forEach(r => {
+  layout(r, rx, 0);
+  rx += subtreeWidth(r) + GAP_X * 2;
+});
+
+// Render
+const canvas = document.getElementById('canvas');
+const svgEl = document.getElementById('svg-lines');
+const tooltip = document.getElementById('tooltip');
+
+const allNames = Object.keys(positions);
+let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+allNames.forEach(n => {
+  const p = positions[n];
+  minX = Math.min(minX, p.x);
+  minY = Math.min(minY, p.y);
+  maxX = Math.max(maxX, p.x + NW);
+  maxY = Math.max(maxY, p.y + NH);
+});
+
+const PAD = 60;
+const totalW = maxX - minX + PAD * 2;
+const totalH = maxY - minY + PAD * 2;
+
+canvas.style.width = totalW + 'px';
+canvas.style.height = totalH + 'px';
+svgEl.style.width = totalW + 'px';
+svgEl.style.height = totalH + 'px';
+
+// Draw connectors
+const pathData = [];
+allNames.forEach(name => {
+  const kids = children[name] || [];
+  const p = positions[name];
+  const px = p.x - minX + PAD;
+  const py = p.y - minY + PAD;
+  kids.forEach(k => {
+    const cp = positions[k];
+    const cx2 = cp.x - minX + PAD;
+    const cy2 = cp.y - minY + PAD;
+    const x1 = px + NW / 2;
+    const y1 = py + NH;
+    const x2 = cx2 + NW / 2;
+    const y2 = cy2;
+    const midY = (y1 + y2) / 2;
+    pathData.push(`M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}`);
+  });
+});
+
+svgEl.innerHTML = pathData.map(d => `<path class="connector" d="${d}"/>`).join('');
+
+// Draw nodes
+allNames.forEach(name => {
+  const node = RAW.find(r => r.name === name);
+  if (!node) return;
+  const p = positions[name];
+  const isManager = MANAGERS.has(name);
+  const isTechLead = TECH_LEADS.has(name);
+
+  const div = document.createElement('div');
+  div.className = 'node' + (isManager ? ' manager' : isTechLead ? ' techlead' : '');
+  div.style.left = (p.x - minX + PAD) + 'px';
+  div.style.top = (p.y - minY + PAD) + 'px';
+
+  div.innerHTML = `
+    <div class="node-name">${name}</div>
+    <div class="node-role">${node.fn}</div>
+    ${isManager ? '<div class="node-badge"></div>' : ''}
+  `;
+
+  div.addEventListener('mouseenter', e => {
+    const numReports = (children[name] || []).length;
+    tooltip.style.display = 'block';
+    tooltip.innerHTML = `
+      <div class="tt-name">${name}${isManager ? ' 🔴' : isTechLead ? ' 🩷' : ''}</div>
+      <div class="tt-row"><span>Function</span><span class="tt-val">${node.fn}</span></div>
+      <div class="tt-row"><span>Effort</span><span class="tt-val">${node.effort}</span></div>
+      ${isTechLead ? `<div class="tt-row"><span>Role</span><span class="tt-val" style="color:var(--pink)">Tech Lead</span></div>` : ''}
+      <div class="tt-row"><span>Reports</span><span class="tt-val">${numReports}</span></div>
+      ${node.coach ? `<div class="tt-row"><span>Coach</span><span class="tt-val">${node.coach}</span></div>` : ''}
+    `;
+  });
+  div.addEventListener('mousemove', e => {
+    tooltip.style.left = (e.clientX + 14) + 'px';
+    tooltip.style.top = (e.clientY - 10) + 'px';
+  });
+  div.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+
+  canvas.appendChild(div);
+});
+
+// Pan & zoom
+const wrap = document.getElementById('canvas-wrap');
+const scene = document.getElementById('scene');
+let scale = 1, tx = 40, ty = 20;
+let dragging = false, lastX, lastY;
+
+// Smooth zoom state
+let targetScale = scale, targetTx = tx, targetTy = ty;
+let animating = false;
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+function animate() {
+  const ease = 0.12;
+  scale = lerp(scale, targetScale, ease);
+  tx = lerp(tx, targetTx, ease);
+  ty = lerp(ty, targetTy, ease);
+  scene.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+  if (Math.abs(scale - targetScale) > 0.0005 || Math.abs(tx - targetTx) > 0.3 || Math.abs(ty - targetTy) > 0.3) {
+    requestAnimationFrame(animate);
+  } else {
+    scale = targetScale; tx = targetTx; ty = targetTy;
+    scene.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+    animating = false;
+  }
+}
+
+function startAnimate() {
+  if (!animating) { animating = true; requestAnimationFrame(animate); }
+}
+
+wrap.addEventListener('mousedown', e => {
+  dragging = true;
+  lastX = e.clientX; lastY = e.clientY;
+  wrap.classList.add('dragging');
+});
+window.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  const dx = e.clientX - lastX;
+  const dy = e.clientY - lastY;
+  tx += dx; ty += dy; targetTx += dx; targetTy += dy;
+  lastX = e.clientX; lastY = e.clientY;
+  scene.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+});
+window.addEventListener('mouseup', () => { dragging = false; wrap.classList.remove('dragging'); });
+
+wrap.addEventListener('wheel', e => {
+  e.preventDefault();
+  const zoomFactor = e.deltaY < 0 ? 1.08 : 0.93;
+  const rect = wrap.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  const newScale = Math.max(0.08, Math.min(3, targetScale * zoomFactor));
+  const scaleRatio = newScale / targetScale;
+  targetTx = mx - (mx - targetTx) * scaleRatio;
+  targetTy = my - (my - targetTy) * scaleRatio;
+  targetScale = newScale;
+  startAnimate();
+}, { passive: false });
+
+// Touch support
+let lastTouchDist = null;
+wrap.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) {
+    dragging = true;
+    lastX = e.touches[0].clientX;
+    lastY = e.touches[0].clientY;
+  }
+}, { passive: true });
+wrap.addEventListener('touchmove', e => {
+  if (e.touches.length === 1 && dragging) {
+    const dx = e.touches[0].clientX - lastX;
+    const dy = e.touches[0].clientY - lastY;
+    tx += dx; ty += dy; targetTx += dx; targetTy += dy;
+    lastX = e.touches[0].clientX;
+    lastY = e.touches[0].clientY;
+    scene.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+  }
+}, { passive: true });
+wrap.addEventListener('touchend', () => { dragging = false; lastTouchDist = null; });
+
+// Fit view
+function fitView() {
+  const ww = wrap.clientWidth;
+  const wh = wrap.clientHeight;
+  const s = Math.min(ww / totalW, wh / totalH) * 0.9;
+  targetScale = s;
+  targetTx = (ww - totalW * s) / 2;
+  targetTy = (wh - totalH * s) / 2;
+  startAnimate();
+}
+
+document.getElementById('btn-fit').addEventListener('click', fitView);
+document.getElementById('btn-in').addEventListener('click', () => {
+  const rect = wrap.getBoundingClientRect();
+  const mx = rect.width / 2, my = rect.height / 2;
+  const newScale = Math.min(3, targetScale * 1.3);
+  const scaleRatio = newScale / targetScale;
+  targetTx = mx - (mx - targetTx) * scaleRatio;
+  targetTy = my - (my - targetTy) * scaleRatio;
+  targetScale = newScale;
+  startAnimate();
+});
+document.getElementById('btn-out').addEventListener('click', () => {
+  const rect = wrap.getBoundingClientRect();
+  const mx = rect.width / 2, my = rect.height / 2;
+  const newScale = Math.max(0.08, targetScale / 1.3);
+  const scaleRatio = newScale / targetScale;
+  targetTx = mx - (mx - targetTx) * scaleRatio;
+  targetTy = my - (my - targetTy) * scaleRatio;
+  targetScale = newScale;
+  startAnimate();
+});
+
+fitView();
+</script>
+</body>
+</html>
