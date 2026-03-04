@@ -1,0 +1,1131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Team Org Chart</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f0f2f8;
+    --surface: #ffffff;
+    --surface2: #e8ebf5;
+    --border: #d0d5e8;
+    --text: #1e2240;
+    --text-muted: #7b82a8;
+    --accent: #4f7cff;
+    --accent-glow: rgba(79,124,255,0.12);
+    --red: #e8294a;
+    --red-bg: rgba(232,41,74,0.08);
+    --red-border: rgba(232,41,74,0.35);
+    --green: #1a7a4a;
+    --green-bg: rgba(34,180,100,0.1);
+    --green-border: rgba(26,122,74,0.45);
+    --connector: #8892bb;
+    --node-w: 130px;
+    --node-h: 52px;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    background: rgba(240,242,248,0.95);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 20px;
+    flex-wrap: wrap;
+  }
+
+  header h1 {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--text);
+    white-space: nowrap;
+  }
+
+  /* Switcher pill */
+  .switcher {
+    display: flex;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 3px;
+    gap: 2px;
+  }
+
+  .switcher button {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    padding: 5px 14px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.18s;
+    white-space: nowrap;
+  }
+
+  .switcher button.active {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+  }
+
+  /* Change badge */
+  .change-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(232,41,74,0.08);
+    border: 1px solid rgba(232,41,74,0.2);
+    color: var(--red);
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .change-badge:hover {
+    background: rgba(232,41,74,0.14);
+  }
+
+  .change-badge.hidden { display: none; }
+
+  .legend {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text-muted);
+    flex-wrap: wrap;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+  }
+
+  .legend-dot.manager { background: var(--red); }
+  .legend-dot.techlead { background: #22b464; }
+  .legend-dot.regular { background: var(--accent); border: 1px solid rgba(79,124,255,0.5); }
+
+  .controls {
+    display: flex;
+    gap: 6px;
+  }
+
+  .controls button {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 5px 11px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: 'DM Mono', monospace;
+    transition: all 0.15s;
+  }
+
+  .controls button:hover {
+    background: var(--accent-glow);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* Changes panel */
+  #changes-panel {
+    position: fixed;
+    top: 55px; right: 16px;
+    z-index: 200;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    min-width: 260px;
+    max-width: 300px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    display: none;
+  }
+
+  #changes-panel.visible { display: block; }
+
+  #changes-panel h3 {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    letter-spacing: 0.03em;
+  }
+
+  .change-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 11.5px;
+    color: var(--text-muted);
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(208,213,232,0.5);
+    line-height: 1.4;
+  }
+
+  .change-item:last-child { border-bottom: none; }
+
+  .change-icon {
+    font-size: 13px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .change-item strong { color: var(--text); font-weight: 600; }
+
+  #canvas-wrap {
+    position: fixed;
+    top: 53px; left: 0; right: 0; bottom: 0;
+    overflow: hidden;
+    cursor: grab;
+  }
+
+  #canvas-wrap.dragging { cursor: grabbing; }
+
+  #scene {
+    position: absolute;
+    transform-origin: 0 0;
+  }
+
+  #scene svg.connectors {
+    position: absolute;
+    top: 0; left: 0;
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  .node {
+    position: absolute;
+    width: var(--node-w);
+    height: var(--node-h);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.12s, box-shadow 0.12s, border-color 0.12s;
+    padding: 6px 8px;
+    text-align: center;
+  }
+
+  .node:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    border-color: var(--accent);
+    z-index: 10;
+  }
+
+  .node.manager {
+    background: var(--red-bg);
+    border-color: var(--red-border);
+  }
+
+  .node.manager:hover {
+    border-color: var(--red);
+    box-shadow: 0 8px 24px rgba(255,77,109,0.2);
+  }
+
+  .node.techlead {
+    background: var(--green-bg);
+    border-color: var(--green-border);
+  }
+
+  .node.techlead:hover {
+    border-color: var(--green);
+    box-shadow: 0 8px 24px rgba(26,122,74,0.15);
+  }
+
+  /* Highlight changed nodes in proposal view */
+  .node.changed {
+    outline: 2px solid var(--red);
+    outline-offset: 2px;
+  }
+
+  .node-name {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 112px;
+  }
+
+  .node.manager .node-name { color: #c0122e; }
+  .node.manager .node-role { color: rgba(192,18,46,0.7); }
+  .node.techlead .node-name { color: var(--green); }
+  .node.techlead .node-role { color: rgba(26,122,74,0.75); }
+
+  .node-role {
+    font-size: 9.5px;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 112px;
+  }
+
+  .node-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    width: 10px;
+    height: 10px;
+    background: var(--red);
+    border-radius: 50%;
+    border: 2px solid var(--bg);
+  }
+
+  /* Unassigned */
+  .unassigned-label {
+    position: absolute;
+    font-size: 9px;
+    font-family: 'DM Mono', monospace;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.7;
+  }
+
+  .unassigned-node {
+    position: absolute;
+    width: var(--node-w);
+    height: var(--node-h);
+    background: var(--bg);
+    border: 1.5px dashed var(--border);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 8px;
+    text-align: center;
+    opacity: 0.75;
+  }
+
+  .unassigned-node .node-name {
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+
+  .unassigned-node .node-role {
+    font-size: 9.5px;
+    color: var(--text-muted);
+    font-family: 'DM Mono', monospace;
+    margin-top: 2px;
+    opacity: 0.7;
+  }
+
+  /* Tooltip */
+  #tooltip {
+    position: fixed;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 300;
+    display: none;
+    max-width: 220px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  }
+
+  #tooltip .tt-name { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+  #tooltip .tt-row { display: flex; justify-content: space-between; gap: 16px; color: var(--text-muted); font-size: 11px; margin-top: 2px; }
+  #tooltip .tt-val { color: var(--text); }
+  #tooltip .tt-change { color: var(--red); font-size: 10.5px; margin-top: 5px; font-style: italic; }
+
+  path.connector { fill: none; stroke: var(--connector); stroke-width: 2; }
+
+  /* View transition */
+  #scene { transition: opacity 0.2s; }
+  #scene.fading { opacity: 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Team Org Chart</h1>
+
+  <div class="switcher">
+    <button id="btn-orig" class="active" onclick="switchView('orig')">Current</button>
+    <button id="btn-prop" onclick="switchView('prop')">Proposal</button>
+  </div>
+
+  <span class="change-badge hidden" id="badge-changes" onclick="toggleChangesPanel()">
+    ● 5 changes
+  </span>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot manager"></div> Function Manager</div>
+    <div class="legend-item"><div class="legend-dot techlead"></div> Tech Lead</div>
+    <div class="legend-item"><div class="legend-dot regular"></div> Team Member</div>
+  </div>
+
+  <div class="controls">
+    <button id="btn-fit">Fit View</button>
+    <button id="btn-in">＋ Zoom</button>
+    <button id="btn-out">－ Zoom</button>
+    
+  </div>
+</header>
+
+<!-- Changes panel -->
+<div id="changes-panel">
+  <h3>📋 Proposal Changes</h3>
+  <div class="change-item"><span class="change-icon">↪</span><span><strong>Ting-Kai</strong> moved from Jaime → Laurence</span></div>
+  <div class="change-item"><span class="change-icon">↪</span><span><strong>Lee Heng</strong> moved from Ting-Kai → Jocelin Ho</span></div>
+  <div class="change-item"><span class="change-icon">↪</span><span><strong>Laurence</strong> moved from Grace Kuo → Mica</span></div>
+  <div class="change-item"><span class="change-icon">⬆</span><span><strong>Jocelin Ho</strong> promoted to Function Manager</span></div>
+  <div class="change-item"><span class="change-icon">✕</span><span><strong>Delphine</strong> removed — reports now under Chris</span></div>
+  <div class="change-item"><span class="change-icon">↪</span><span><strong>Soli & Sherlyn</strong> groups moved under Morgan</span></div>
+</div>
+
+<div id="canvas-wrap">
+  <div id="scene">
+    <svg class="connectors" id="svg-lines"></svg>
+    <div id="canvas"></div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+// ─── DATA ────────────────────────────────────────────────────────────────────
+
+const CONFIGS = {
+  orig: {
+    MANAGERS: new Set(['Russ','Angela','Grace Chen','Delphine','Chris','Hamish','Yu-Tang','Jessie']),
+    TECH_LEADS: new Set(['YY','Jocelin Ho','Landice','Weihang','Jaime','Maso','Justin','Eason']),
+    RAW: [
+      {id:1,name:'John',coach:null,fn:'Other',effort:'Mixed'},
+      {id:2,name:'Jaime',coach:'John',fn:'Dev (Frontend)',effort:'Explore'},
+      {id:4,name:'Joanne',coach:'John',fn:'Visual Design',effort:'Mixed'},
+      {id:5,name:'Ching-Mei',coach:'John',fn:'Other',effort:'Mixed'},
+      {id:7,name:'YY',coach:'Russ',fn:'Dev (iOS)',effort:'PicCollage'},
+      {id:12,name:'Mica',coach:'John',fn:'Other',effort:'Company'},
+      {id:21,name:'Angela',coach:'John',fn:'Product Management',effort:'PicCollage'},
+      {id:79,name:'Way',coach:'Chris',fn:'Product Design',effort:'PicCollage'},
+      {id:82,name:'Maso',coach:'Russ',fn:'MLAD',effort:'Mixed'},
+      {id:94,name:'Chris',coach:'John',fn:'Product Design',effort:'PicCollage'},
+      {id:127,name:'Simon',coach:'Russ',fn:'Dev (iOS)',effort:'PicCollage'},
+      {id:128,name:'Christine Chen',coach:'Hamish',fn:'Users',effort:'PicCollage'},
+      {id:133,name:'Maggie',coach:'Angela',fn:'Product Management',effort:'PicCollage'},
+      {id:136,name:'Raymond',coach:'Jocelin Ho',fn:'Dev (iOS)',effort:'Explore'},
+      {id:148,name:'Grace Kuo',coach:'Irene',fn:'Operations',effort:'Company'},
+      {id:158,name:'Yanbin',coach:'Landice',fn:'Dev (Android)',effort:'PicCollage'},
+      {id:161,name:'Jessie',coach:'John',fn:'Operations',effort:'Company'},
+      {id:167,name:'Russ',coach:'John',fn:'Engineering',effort:'Mixed'},
+      {id:168,name:'Minnie',coach:'Amelia',fn:'Marketing',effort:'PicCollage'},
+      {id:173,name:'Amelia',coach:'Grace Chen',fn:'Marketing',effort:'PicCollage'},
+      {id:176,name:'Nichele',coach:'Grace Chen',fn:'Marketing',effort:'PicCollage'},
+      {id:177,name:'CJ',coach:'Liyu',fn:'Product Management',effort:'PicCollage'},
+      {id:180,name:'Kobe',coach:'Mica',fn:'Operations',effort:'Company'},
+      {id:185,name:'Jo',coach:'YY',fn:'Dev (iOS)',effort:'PicCollage'},
+      {id:186,name:'Alex',coach:'Maggie',fn:'Product Management',effort:'PicCollage'},
+      {id:188,name:'JJ',coach:'Way',fn:'Product Design',effort:'Explore'},
+      {id:191,name:'Tinya',coach:'Way',fn:'Product Design',effort:'Explore'},
+      {id:193,name:'Judy',coach:'Mica',fn:'Operations',effort:'Company'},
+      {id:195,name:'YC',coach:'Maso',fn:'MLAD',effort:'Explore'},
+      {id:196,name:'Palm',coach:'Chris',fn:'Product Design',effort:'Explore'},
+      {id:198,name:'Landice',coach:'Russ',fn:'Dev (Android)',effort:'PicCollage'},
+      {id:208,name:'Emily',coach:'Chris',fn:'Product Design',effort:'PicCollage'},
+      {id:209,name:'Nina',coach:'Delphine',fn:'Visual Design',effort:'PicCollage'},
+      {id:214,name:'James',coach:'Weihang',fn:'Dev (Backend)',effort:'PicCollage'},
+      {id:224,name:'Althea',coach:'Amelia',fn:'Marketing',effort:'PicCollage'},
+      {id:226,name:'Weihang',coach:'Russ',fn:'Dev (Backend)',effort:'PicCollage'},
+      {id:229,name:'Brad',coach:'Russ',fn:'MLAD',effort:'PicCollage'},
+      {id:230,name:'Jude',coach:'Judy',fn:'Operations',effort:'Company'},
+      {id:231,name:'Katherine',coach:'Chris',fn:'Product Design',effort:'PicCollage'},
+      {id:232,name:'Amy',coach:'Angela',fn:'Product Management',effort:'PicCollage'},
+      {id:237,name:'Justin',coach:'Jocelin Ho',fn:'Dev (iOS)',effort:'Explore'},
+      {id:240,name:'Katie',coach:null,fn:'Visual Design',effort:'PicCollage'},
+      {id:243,name:'Ting-Kai',coach:'Jaime',fn:'Dev (Frontend)',effort:'Explore'},
+      {id:245,name:'Ana',coach:'Amelia',fn:'Marketing',effort:'PicCollage'},
+      {id:246,name:'Naomi',coach:null,fn:'Visual Design',effort:'PicCollage'},
+      {id:247,name:'Eason',coach:'Russ',fn:'Dev (QA)',effort:'PicCollage'},
+      {id:249,name:'Andy Lee',coach:'Grace Chen',fn:'Marketing',effort:'PicCollage'},
+      {id:251,name:'Phoebe',coach:'Ellen',fn:'Operations',effort:'Company'},
+      {id:253,name:'Sherlyn',coach:'Delphine',fn:'Visual Design',effort:'PicCollage'},
+      {id:254,name:'Sandra',coach:'Hamish',fn:'Users',effort:'Explore'},
+      {id:256,name:'Cindy Wang',coach:null,fn:'Product Management',effort:'Mixed'},
+      {id:257,name:'Laurence',coach:'Grace Kuo',fn:'Operations',effort:'Company'},
+      {id:259,name:'Aaron Chiu',coach:'Eason',fn:'Dev (QA)',effort:'PicCollage'},
+      {id:263,name:'Winnie',coach:null,fn:'Visual Design',effort:'PicCollage'},
+      {id:265,name:'Aaron Ni',coach:'YY',fn:'Dev (iOS)',effort:'PicCollage'},
+      {id:266,name:'Morgan',coach:'Chris',fn:'Product Design',effort:'PicCollage'},
+      {id:267,name:'Alice',coach:'Grace Chen',fn:'Marketing',effort:'Explore'},
+      {id:270,name:'Zalman',coach:'Maggie',fn:'Product Management',effort:'PicCollage'},
+      {id:273,name:'Grace Yen',coach:'CJ',fn:'Users',effort:'PicCollage'},
+      {id:275,name:'Liyu',coach:'Angela',fn:'Product Management',effort:'PicCollage'},
+      {id:277,name:'Kelsy',coach:'Yichen',fn:'Users',effort:'PicCollage'},
+      {id:278,name:'Anny',coach:'Russ',fn:'MLAD',effort:'PicCollage'},
+      {id:281,name:'Soli',coach:'Delphine',fn:'Visual Design',effort:'PicCollage'},
+      {id:282,name:'Messi',coach:'Weihang',fn:'Dev (Frontend)',effort:'PicCollage'},
+      {id:283,name:'Christine Lin',coach:'Rick',fn:'Operations',effort:'Company'},
+      {id:284,name:'Sonia',coach:'Delphine',fn:'Visual Design',effort:'Company'},
+      {id:290,name:'Vivi',coach:'Russ',fn:'Dev (Frontend)',effort:'PicCollage'},
+      {id:291,name:'Ouyang',coach:'Aaron Ni',fn:'Dev (iOS)',effort:'PicCollage'},
+      {id:294,name:'Tim',coach:'Yanbin',fn:'Dev (Android)',effort:'PicCollage'},
+      {id:295,name:'Nana',coach:'Liyu',fn:'Product Management',effort:'PicCollage'},
+      {id:296,name:'Cersei',coach:'Grace Kuo',fn:'Operations',effort:'Company'},
+      {id:299,name:'Devin',coach:'Jocelin Ho',fn:'Dev (iOS)',effort:'Explore'},
+      {id:300,name:'Vivienne',coach:'Justin',fn:'Dev (IVP)',effort:'Explore'},
+      {id:301,name:'Patrik',coach:'Yanbin',fn:'Dev (Android)',effort:'Explore'},
+      {id:304,name:'Charles Tseng',coach:'Yu-Tang',fn:'Product Management',effort:'Explore'},
+      {id:305,name:'Lapor',coach:'Laurence',fn:'Dev (Frontend)',effort:'Explore'},
+      {id:307,name:'Yu-Tang',coach:'John',fn:'Product Management',effort:'Explore'},
+      {id:308,name:'Filipe',coach:'John',fn:'Product Management',effort:'Mixed'},
+      {id:309,name:'Kerwin',coach:'Way',fn:'Product Design',effort:'PicCollage'},
+      {id:312,name:'Delphine',coach:'Chris',fn:'Visual Design',effort:'PicCollage'},
+      {id:314,name:'Shannon',coach:'Maso',fn:'MLAD',effort:'Explore'},
+      {id:316,name:'Hamish',coach:'Angela',fn:'Users',effort:'PicCollage'},
+      {id:320,name:'Vivian',coach:'Romeo',fn:'Marketing',effort:'Explore'},
+      {id:322,name:'Anna',coach:'Nichele',fn:'Marketing',effort:'PicCollage'},
+      {id:323,name:'Lee Heng',coach:'Ting-Kai',fn:'Dev (Frontend)',effort:'PicCollage'},
+      {id:324,name:'Daphne',coach:'Amelia',fn:'Marketing',effort:'PicCollage'},
+      {id:325,name:'Peter',coach:'YY',fn:'Dev (iOS)',effort:'PicCollage'},
+      {id:329,name:'Keke',coach:'Jocelin Ho',fn:'Dev (iOS)',effort:'Explore'},
+      {id:334,name:'Rina',coach:'Justin',fn:'Dev (IVP)',effort:'Explore'},
+      {id:335,name:'Grace Chen',coach:'John',fn:'Marketing',effort:'Mixed'},
+      {id:337,name:'Yuji Wong',coach:'Landice',fn:'Dev (Android)',effort:'PicCollage'},
+      {id:339,name:'Kelvin',coach:'Way',fn:'Product Design',effort:'Explore'},
+      {id:342,name:'Fumi',coach:'James',fn:'Dev (Backend)',effort:'PicCollage'},
+      {id:346,name:'Mami',coach:null,fn:'Users',effort:'PicCollage'},
+      {id:347,name:'Rick',coach:'Jessie',fn:'Operations',effort:'Company'},
+      {id:349,name:'Romeo',coach:'Andy Lee',fn:'Marketing',effort:'Explore'},
+      {id:354,name:'Tina',coach:'Daphne',fn:'Marketing',effort:'PicCollage'},
+      {id:357,name:'Jocelyn',coach:'Nichele',fn:'Marketing',effort:'PicCollage'},
+      {id:359,name:'Lila',coach:'CJ',fn:'Users',effort:'PicCollage'},
+      {id:362,name:'Anna Lasko',coach:'Alice',fn:'Marketing',effort:'Explore'},
+      {id:363,name:'Jocelin Ho',coach:'Russ',fn:'Dev (iOS)',effort:'Explore'},
+      {id:364,name:'Ameily Chang',coach:'Soli',fn:'Visual Design',effort:'PicCollage'},
+      {id:366,name:'Angela Wu',coach:'Christine Chen',fn:'Users',effort:'PicCollage'},
+      {id:367,name:'Elisabeth McNeill',coach:'Sandra',fn:'Users',effort:'Explore'},
+      {id:369,name:'Genie',coach:'Aaron Chiu',fn:'Dev (QA)',effort:'PicCollage'},
+      {id:370,name:'Jose',coach:'Andy Lee',fn:'Marketing',effort:'PicCollage'},
+      {id:371,name:'Alice Lin',coach:'Anny',fn:'MLAD',effort:'Explore'},
+      {id:372,name:'Wen',coach:'JJ',fn:'Visual Design',effort:'PicCollage'},
+      {id:373,name:'Amelia Hu',coach:'Christine Chen',fn:'Users',effort:'PicCollage'},
+      {id:375,name:'Lawrence Chou',coach:'Weihang',fn:'Dev (Backend)',effort:'PicCollage'},
+      {id:376,name:'Ashley Hsu',coach:'Althea',fn:'Marketing',effort:'PicCollage'},
+      {id:377,name:'Jeff Chang',coach:'Sherlyn',fn:'Visual Design',effort:'PicCollage'},
+      {id:378,name:'Phoebe Zheng',coach:null,fn:'Operations (Tester)',effort:'Company'},
+      {id:380,name:'Yichen',coach:'Hamish',fn:'Users',effort:'PicCollage'},
+      {id:382,name:'Ellen',coach:'Jessie',fn:'Operations',effort:'Company'},
+      {id:385,name:'Sophia',coach:'Judy',fn:'Operations',effort:'Company'},
+      {id:388,name:'Roberto',coach:null,fn:'Operations (Tester)',effort:'Company'},
+      {id:389,name:'Jack Chen',coach:'Anny',fn:'MLAD',effort:'Explore'},
+      {id:390,name:'Colby',coach:'Laurence',fn:'Operations',effort:'Company'},
+      {id:391,name:'Tony',coach:'Yu-Tang',fn:'Product Management',effort:'Explore'},
+      {id:392,name:'Ann',coach:'Ameily Chang',fn:'Visual Design',effort:'PicCollage'},
+      {id:393,name:'Heather',coach:null,fn:'Operations (Tester)',effort:'Company'},
+      {id:394,name:'Lia',coach:'Morgan',fn:'Product Design',effort:'PicCollage'},
+      {id:395,name:'Annie',coach:'Nichele',fn:'Marketing',effort:'PicCollage'},
+      {id:396,name:'Irene',coach:'Jessie',fn:'Operations',effort:'Company'},
+      {id:397,name:'Jimmy',coach:null,fn:'Operations',effort:'Company'},
+      {id:398,name:'Chun-Wei',coach:'Brad',fn:'MLAD',effort:'PicCollage'},
+      {id:399,name:'Oscar',coach:'Tinya',fn:'Product Design',effort:'Explore'},
+      {id:400,name:'Maggie Chu',coach:'Yu-Tang',fn:'Product Management',effort:'Explore'},
+      {id:401,name:'Cindy Yeh',coach:null,fn:'Operations (Tester)',effort:'Company'},
+    ],
+    fnPriority(name, parent) {
+      const node = this.byName[name];
+      if (!node) return 99;
+      const fn = node.fn || '';
+      if (parent === 'Russ') {
+        if (name === 'Jocelin Ho')   return 0;
+        if (name === 'YY')           return 1;
+        if (name === 'Landice')      return 2;
+        if (name === 'Weihang')      return 3;
+        if (name === 'Eason')        return 4;
+        if (name === 'Maso')         return 5;
+        if (name === 'Anny')         return 6;
+        if (name === 'Brad')         return 7;
+        if (name === 'Simon')        return 8;
+        if (name === 'Vivi')         return 99;
+        return 50;
+      }
+      if (parent === 'John') {
+        if (name === 'Grace Chen')   return 0;
+        if (name === 'Angela')       return 1;
+        if (name === 'Filipe')       return 2;
+        if (name === 'Chris')        return 3;
+        if (name === 'Yu-Tang')      return 4;
+        if (fn === 'Engineering')    return 5;
+        if (fn.startsWith('Dev'))    return 6;
+        if (name === 'Joanne')       return 7;
+        if (name === 'Ching-Mei')    return 8;
+        if (fn === 'Other')          return 9;
+        if (fn === 'Operations' && name !== 'Jessie') return 10;
+        if (name === 'Jessie')       return 99;
+        return 50;
+      }
+      if (parent === 'Chris') {
+        if (name === 'Delphine')     return 0;
+        if (name === 'Way')          return 99;
+        return 5;
+      }
+      if (fn === 'Engineering')        return 0;
+      if (fn.startsWith('Dev'))        return 1;
+      if (fn === 'MLAD')               return 2;
+      if (fn === 'Product Management') return 3;
+      if (fn === 'Product Design')     return 4;
+      if (fn === 'Visual Design')      return 5;
+      if (fn === 'Marketing')          return 6;
+      if (fn === 'Users')              return 7;
+      if (fn === 'Operations')         return 8;
+      return 9;
+    },
+    showUnassigned: false,
+    changedPeople: new Set(),
+  },
+
+  prop: {
+    MANAGERS: new Set(['Russ','Angela','Grace Chen','Delphine','Chris','Hamish','Yu-Tang','Jessie','Jocelin Ho']),
+    TECH_LEADS: new Set(['YY','Landice','Weihang','Jaime','Maso','Justin','Eason']),
+    RAW: [
+      {id:1,name:'John',coach:null,fn:'Other',effort:'Mixed'},
+      {id:2,name:'Jaime',coach:'John',fn:'Dev (Frontend)',effort:'Explore'},
+      {id:4,name:'Joanne',coach:'John',fn:'Visual Design',effort:'Mixed'},
+      {id:5,name:'Ching-Mei',coach:'John',fn:'Other',effort:'Mixed'},
+      {id:7,name:'YY',coach:'Russ',fn:'Dev (iOS)',effort:'PicCollage'},
+      {id:12,name:'Mica',coach:'John',fn:'Other',effort:'Company'},
+      {id:21,name:'Angela',coach:'John',fn:'Product Management',effort:'PicCollage'},
+      {id:79,name:'Way',coach:'Chris',fn:'Product Design',effort:'PicCollage'},
+      {id:82,name:'Maso',coach:'Russ',fn:'MLAD',effort:'Mixed'},
+      {id:94,name:'Chris',coach:'John',fn:'Product Design',effort:'PicCollage'},
+      {id:127,name:'Simon',coach:'Russ',fn:'Dev (iOS)',effort:'PicCollage'},
+      {id:128,name:'Christine Chen',coach:'Hamish',fn:'Users',effort:'PicCollage'},
+      {id:133,name:'Maggie',coach:'Angela',fn:'Product Management',effort:'PicCollage'},
+      {id:136,name:'Raymond',coach:'Jocelin Ho',fn:'Dev (iOS)',effort:'Explore'},
+      {id:148,name:'Grace Kuo',coach:'Irene',fn:'Operations',effort:'Company'},
+      {id:158,name:'Yanbin',coach:'Landice',fn:'Dev (Android)',effort:'PicCollage'},
+      {id:161,name:'Jessie',coach:'John',fn:'Operations',effort:'Company'},
+      {id:167,name:'Russ',coach:'John',fn:'Engineering',effort:'Mixed'},
+      {id:168,name:'Minnie',coach:'Amelia',fn:'Marketing',effort:'PicCollage'},
+      {id:173,name:'Amelia',coach:'Grace Chen',fn:'Marketing',effort:'PicCollage'},
+      {id:176,name:'Nichele',coach:'Grace Chen',fn:'Marketing',effort:'PicCollage'},
+      {id:177,name:'CJ',coach:'Liyu',fn:'Product Management',effort:'PicCollage'},
+      {id:180,name:'Kobe',coach:'Mica',fn:'Operations',effort:'Company'},
+      {id:185,name:'Jo',coach:'YY',fn:'Dev (iOS)',effort:'PicCollage'},
+      {id:186,name:'Alex',coach:'Maggie',fn:'Product Management',effort:'PicCollage'},
+      {id:188,name:'JJ',coach:'Way',fn:'Product Design',effort:'Explore'},
+      {id:191,name:'Tinya',coach:'Way',fn:'Product Design',effort:'Explore'},
+      {id:193,name:'Judy',coach:'Mica',fn:'Operations',effort:'Company'},
+      {id:195,name:'YC',coach:'Maso',fn:'MLAD',effort:'Explore'},
+      {id:196,name:'Palm',coach:'Chris',fn:'Product Design',effort:'Explore'},
+      {id:198,name:'Landice',coach:'Russ',fn:'Dev (Android)',effort:'PicCollage'},
+      {id:208,name:'Emily',coach:'Chris',fn:'Product Design',effort:'PicCollage'},
+      {id:209,name:'Nina',coach:'Chris',fn:'Visual Design',effort:'PicCollage'},
+      {id:214,name:'James',coach:'Weihang',fn:'Dev (Backend)',effort:'PicCollage'},
+      {id:224,name:'Althea',coach:'Amelia',fn:'Marketing',effort:'PicCollage'},
+      {id:226,name:'Weihang',coach:'Russ',fn:'Dev (Backend)',effort:'PicCollage'},
+      {id:229,name:'Brad',coach:'Russ',fn:'MLAD',effort:'PicCollage'},
+      {id:230,name:'Jude',coach:'Judy',fn:'Operations',effort:'Company'},
+      {id:231,name:'Katherine',coach:'Chris',fn:'Product Design',effort:'PicCollage'},
+      {id:232,name:'Amy',coach:'Angela',fn:'Product Management',effort:'PicCollage'},
+      {id:237,name:'Justin',coach:'Jocelin Ho',fn:'Dev (iOS)',effort:'Explore'},
+      {id:240,name:'Katie',coach:null,fn:'Visual Design',effort:'PicCollage'},
+      {id:243,name:'Ting-Kai',coach:'Laurence',fn:'Dev (Frontend)',effort:'Explore'},
+      {id:245,name:'Ana',coach:'Amelia',fn:'Marketing',effort:'PicCollage'},
+      {id:246,name:'Naomi',coach:null,fn:'Visual Design',effort:'PicCollage'},
+      {id:247,name:'Eason',coach:'Russ',fn:'Dev (QA)',effort:'PicCollage'},
+      {id:249,name:'Andy Lee',coach:'Grace Chen',fn:'Marketing',effort:'PicCollage'},
+      {id:251,name:'Phoebe',coach:'Ellen',fn:'Operations',effort:'Company'},
+      {id:253,name:'Sherlyn',coach:'Morgan',fn:'Visual Design',effort:'PicCollage'},
+      {id:254,name:'Sandra',coach:'Hamish',fn:'Users',effort:'Explore'},
+      {id:256,name:'Cindy Wang',coach:null,fn:'Product Management',effort:'Mixed'},
+      {id:257,name:'Laurence',coach:'Mica',fn:'Operations',effort:'Company'},
+      {id:259,name:'Aaron Chiu',coach:'Eason',fn:'Dev (QA)',effort:'PicCollage'},
+      {id:263,name:'Winnie',coach:null,fn:'Visual Design',effort:'PicCollage'},
+      {id:265,name:'Aaron Ni',coach:'YY',fn:'Dev (iOS)',effort:'PicCollage'},
+      {id:266,name:'Morgan',coach:'Chris',fn:'Product Design',effort:'PicCollage'},
+      {id:267,name:'Alice',coach:'Grace Chen',fn:'Marketing',effort:'Explore'},
+      {id:270,name:'Zalman',coach:'Maggie',fn:'Product Management',effort:'PicCollage'},
+      {id:273,name:'Grace Yen',coach:'CJ',fn:'Users',effort:'PicCollage'},
+      {id:275,name:'Liyu',coach:'Angela',fn:'Product Management',effort:'PicCollage'},
+      {id:277,name:'Kelsy',coach:'Yichen',fn:'Users',effort:'PicCollage'},
+      {id:278,name:'Anny',coach:'Russ',fn:'MLAD',effort:'PicCollage'},
+      {id:281,name:'Soli',coach:'Morgan',fn:'Visual Design',effort:'PicCollage'},
+      {id:282,name:'Messi',coach:'Weihang',fn:'Dev (Frontend)',effort:'PicCollage'},
+      {id:283,name:'Christine Lin',coach:'Rick',fn:'Operations',effort:'Company'},
+      {id:284,name:'Sonia',coach:'Chris',fn:'Visual Design',effort:'Company'},
+      {id:290,name:'Vivi',coach:'Russ',fn:'Dev (Frontend)',effort:'PicCollage'},
+      {id:291,name:'Ouyang',coach:'Aaron Ni',fn:'Dev (iOS)',effort:'PicCollage'},
+      {id:294,name:'Tim',coach:'Yanbin',fn:'Dev (Android)',effort:'PicCollage'},
+      {id:295,name:'Nana',coach:'Liyu',fn:'Product Management',effort:'PicCollage'},
+      {id:296,name:'Cersei',coach:'Grace Kuo',fn:'Operations',effort:'Company'},
+      {id:299,name:'Devin',coach:'Jocelin Ho',fn:'Dev (iOS)',effort:'Explore'},
+      {id:300,name:'Vivienne',coach:'Justin',fn:'Dev (IVP)',effort:'Explore'},
+      {id:301,name:'Patrik',coach:'Yanbin',fn:'Dev (Android)',effort:'Explore'},
+      {id:304,name:'Charles Tseng',coach:'Yu-Tang',fn:'Product Management',effort:'Explore'},
+      {id:305,name:'Lapor',coach:'Laurence',fn:'Dev (Frontend)',effort:'Explore'},
+      {id:307,name:'Yu-Tang',coach:'John',fn:'Product Management',effort:'Explore'},
+      {id:308,name:'Filipe',coach:'John',fn:'Product Management',effort:'Mixed'},
+      {id:309,name:'Kerwin',coach:'Way',fn:'Product Design',effort:'PicCollage'},
+      {id:314,name:'Shannon',coach:'Maso',fn:'MLAD',effort:'Explore'},
+      {id:316,name:'Hamish',coach:'Angela',fn:'Users',effort:'PicCollage'},
+      {id:320,name:'Vivian',coach:'Romeo',fn:'Marketing',effort:'Explore'},
+      {id:322,name:'Anna',coach:'Nichele',fn:'Marketing',effort:'PicCollage'},
+      {id:323,name:'Lee Heng',coach:'Jocelin Ho',fn:'Dev (Frontend)',effort:'PicCollage'},
+      {id:324,name:'Daphne',coach:'Amelia',fn:'Marketing',effort:'PicCollage'},
+      {id:325,name:'Peter',coach:'YY',fn:'Dev (iOS)',effort:'PicCollage'},
+      {id:329,name:'Keke',coach:'Jocelin Ho',fn:'Dev (iOS)',effort:'Explore'},
+      {id:334,name:'Rina',coach:'Justin',fn:'Dev (IVP)',effort:'Explore'},
+      {id:335,name:'Grace Chen',coach:'John',fn:'Marketing',effort:'Mixed'},
+      {id:337,name:'Yuji Wong',coach:'Landice',fn:'Dev (Android)',effort:'PicCollage'},
+      {id:339,name:'Kelvin',coach:'Way',fn:'Product Design',effort:'Explore'},
+      {id:342,name:'Fumi',coach:'James',fn:'Dev (Backend)',effort:'PicCollage'},
+      {id:346,name:'Mami',coach:null,fn:'Users',effort:'PicCollage'},
+      {id:347,name:'Rick',coach:'Jessie',fn:'Operations',effort:'Company'},
+      {id:349,name:'Romeo',coach:'Andy Lee',fn:'Marketing',effort:'Explore'},
+      {id:354,name:'Tina',coach:'Daphne',fn:'Marketing',effort:'PicCollage'},
+      {id:357,name:'Jocelyn',coach:'Nichele',fn:'Marketing',effort:'PicCollage'},
+      {id:359,name:'Lila',coach:'CJ',fn:'Users',effort:'PicCollage'},
+      {id:362,name:'Anna Lasko',coach:'Alice',fn:'Marketing',effort:'Explore'},
+      {id:363,name:'Jocelin Ho',coach:'Russ',fn:'Dev (iOS)',effort:'Explore'},
+      {id:364,name:'Ameily Chang',coach:'Soli',fn:'Visual Design',effort:'PicCollage'},
+      {id:366,name:'Angela Wu',coach:'Christine Chen',fn:'Users',effort:'PicCollage'},
+      {id:367,name:'Elisabeth McNeill',coach:'Sandra',fn:'Users',effort:'Explore'},
+      {id:369,name:'Genie',coach:'Aaron Chiu',fn:'Dev (QA)',effort:'PicCollage'},
+      {id:370,name:'Jose',coach:'Andy Lee',fn:'Marketing',effort:'PicCollage'},
+      {id:371,name:'Alice Lin',coach:'Anny',fn:'MLAD',effort:'Explore'},
+      {id:372,name:'Wen',coach:'JJ',fn:'Visual Design',effort:'PicCollage'},
+      {id:373,name:'Amelia Hu',coach:'Christine Chen',fn:'Users',effort:'PicCollage'},
+      {id:375,name:'Lawrence Chou',coach:'Weihang',fn:'Dev (Backend)',effort:'PicCollage'},
+      {id:376,name:'Ashley Hsu',coach:'Althea',fn:'Marketing',effort:'PicCollage'},
+      {id:377,name:'Jeff Chang',coach:'Sherlyn',fn:'Visual Design',effort:'PicCollage'},
+      {id:378,name:'Phoebe Zheng',coach:null,fn:'Operations (Tester)',effort:'Company'},
+      {id:380,name:'Yichen',coach:'Hamish',fn:'Users',effort:'PicCollage'},
+      {id:382,name:'Ellen',coach:'Jessie',fn:'Operations',effort:'Company'},
+      {id:385,name:'Sophia',coach:'Judy',fn:'Operations',effort:'Company'},
+      {id:388,name:'Roberto',coach:null,fn:'Operations (Tester)',effort:'Company'},
+      {id:389,name:'Jack Chen',coach:'Anny',fn:'MLAD',effort:'Explore'},
+      {id:390,name:'Colby',coach:'Laurence',fn:'Operations',effort:'Company'},
+      {id:391,name:'Tony',coach:'Yu-Tang',fn:'Product Management',effort:'Explore'},
+      {id:392,name:'Ann',coach:'Ameily Chang',fn:'Visual Design',effort:'PicCollage'},
+      {id:393,name:'Heather',coach:null,fn:'Operations (Tester)',effort:'Company'},
+      {id:394,name:'Lia',coach:'Morgan',fn:'Product Design',effort:'PicCollage'},
+      {id:395,name:'Annie',coach:'Nichele',fn:'Marketing',effort:'PicCollage'},
+      {id:396,name:'Irene',coach:'Jessie',fn:'Operations',effort:'Company'},
+      {id:397,name:'Jimmy',coach:null,fn:'Operations',effort:'Company'},
+      {id:398,name:'Chun-Wei',coach:'Brad',fn:'MLAD',effort:'PicCollage'},
+      {id:399,name:'Oscar',coach:'Tinya',fn:'Product Design',effort:'Explore'},
+      {id:400,name:'Maggie Chu',coach:'Yu-Tang',fn:'Product Management',effort:'Explore'},
+      {id:401,name:'Cindy Yeh',coach:null,fn:'Operations (Tester)',effort:'Company'},
+    ],
+    fnPriority(name, parent) {
+      const node = this.byName[name];
+      if (!node) return 99;
+      const fn = node.fn || '';
+      if (parent === 'Russ') {
+        if (name === 'Simon')        return 0;
+        if (name === 'Vivi')         return 1;
+        if (name === 'Jocelin Ho')   return 2;
+        if (name === 'YY')           return 3;
+        if (name === 'Landice')      return 4;
+        if (name === 'Weihang')      return 5;
+        if (name === 'Eason')        return 6;
+        if (name === 'Maso')         return 7;
+        if (name === 'Anny')         return 8;
+        if (name === 'Brad')         return 9;
+        return 50;
+      }
+      if (parent === 'John') {
+        if (name === 'Grace Chen')   return 0;
+        if (name === 'Angela')       return 1;
+        if (name === 'Chris')        return 2;
+        if (name === 'Yu-Tang')      return 3;
+        if (name === 'Filipe')       return 4;
+        if (fn === 'Engineering')    return 5;
+        if (fn.startsWith('Dev'))    return 6;
+        if (name === 'Joanne')       return 7;
+        if (name === 'Ching-Mei')    return 8;
+        if (fn === 'Other')          return 9;
+        if (fn === 'Operations' && name !== 'Jessie') return 10;
+        if (name === 'Jessie')       return 99;
+        return 50;
+      }
+      if (parent === 'Chris') {
+        if (fn === 'Visual Design')  return 0;
+        if (name === 'Way')          return 99;
+        return 5;
+      }
+      if (parent === 'Morgan') {
+        if (name === 'Lia')  return 0;
+        return 5;
+      }
+      if (fn === 'Engineering')        return 0;
+      if (fn.startsWith('Dev'))        return 1;
+      if (fn === 'MLAD')               return 2;
+      if (fn === 'Product Management') return 3;
+      if (fn === 'Product Design')     return 4;
+      if (fn === 'Visual Design')      return 5;
+      if (fn === 'Marketing')          return 6;
+      if (fn === 'Users')              return 7;
+      if (fn === 'Operations')         return 8;
+      return 9;
+    },
+    showUnassigned: true,
+    changedPeople: new Set(['Ting-Kai','Lee Heng','Laurence','Jocelin Ho','Nina','Sherlyn','Soli','Sonia']),
+  }
+};
+
+// ─── LAYOUT ENGINE ───────────────────────────────────────────────────────────
+const NW = 130, NH = 52, GAP_X = 18, GAP_Y = 56;
+const PAD = 60;
+
+function buildLayout(cfg) {
+  const byName = {};
+  cfg.RAW.forEach(r => byName[r.name] = r);
+  cfg.byName = byName;
+
+  const children = {};
+  cfg.RAW.forEach(r => { if (!children[r.name]) children[r.name] = []; });
+  cfg.RAW.forEach(r => {
+    if (r.coach && byName[r.coach]) children[r.coach].push(r.name);
+  });
+
+  // Sort
+  Object.keys(children).forEach(parent => {
+    children[parent].sort((a, b) => cfg.fnPriority(a, parent) - cfg.fnPriority(b, parent));
+  });
+
+  function subtreeWidth(name) {
+    const kids = children[name] || [];
+    if (kids.length === 0) return NW;
+    const total = kids.reduce((s, k) => s + subtreeWidth(k), 0) + GAP_X * (kids.length - 1);
+    return Math.max(NW, total);
+  }
+
+  const positions = {};
+  function layout(name, x, y) {
+    const kids = children[name] || [];
+    const sw = subtreeWidth(name);
+    positions[name] = { x: x + sw / 2 - NW / 2, y };
+    let cx = x;
+    kids.forEach(k => {
+      const ksw = subtreeWidth(k);
+      layout(k, cx, y + NH + GAP_Y);
+      cx += ksw + GAP_X;
+    });
+  }
+
+  const roots = cfg.RAW.filter(r => !r.coach || !byName[r.coach]).map(r => r.name);
+  let rx = 0;
+  roots.forEach(r => { layout(r, rx, 0); rx += subtreeWidth(r) + GAP_X * 2; });
+
+  return { byName, children, positions };
+}
+
+// ─── RENDER ──────────────────────────────────────────────────────────────────
+const canvasEl = document.getElementById('canvas');
+const svgEl = document.getElementById('svg-lines');
+const tooltip = document.getElementById('tooltip');
+const scene = document.getElementById('scene');
+
+let currentView = 'orig';
+
+function render(viewKey) {
+  const cfg = CONFIGS[viewKey];
+  const { byName, children, positions } = buildLayout(cfg);
+
+  canvasEl.innerHTML = '';
+  svgEl.innerHTML = '';
+
+  const allNames = Object.keys(positions);
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  allNames.forEach(n => {
+    const p = positions[n];
+    minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+    maxX = Math.max(maxX, p.x + NW); maxY = Math.max(maxY, p.y + NH);
+  });
+
+  const totalW = maxX - minX + PAD * 2;
+  const totalH = maxY - minY + PAD * 2;
+  canvasEl.style.width = totalW + 'px';
+  canvasEl.style.height = totalH + 'px';
+  svgEl.style.width = totalW + 'px';
+  svgEl.style.height = totalH + 'px';
+
+  // Connectors
+  const paths = [];
+  allNames.forEach(name => {
+    (children[name] || []).forEach(k => {
+      const p = positions[name], cp = positions[k];
+      const x1 = (p.x - minX + PAD) + NW / 2, y1 = (p.y - minY + PAD) + NH;
+      const x2 = (cp.x - minX + PAD) + NW / 2, y2 = cp.y - minY + PAD;
+      const midY = (y1 + y2) / 2;
+      paths.push(`<path class="connector" d="M ${x1} ${y1} C ${x1} ${midY}, ${x2} ${midY}, ${x2} ${y2}"/>`);
+    });
+  });
+  svgEl.innerHTML = paths.join('');
+
+  // Nodes
+  allNames.forEach(name => {
+    const node = byName[name];
+    if (!node) return;
+    const p = positions[name];
+    const isManager = cfg.MANAGERS.has(name);
+    const isTechLead = cfg.TECH_LEADS.has(name);
+    const isChanged = cfg.changedPeople.has(name);
+
+    const div = document.createElement('div');
+    let cls = 'node';
+    if (isManager) cls += ' manager';
+    else if (isTechLead) cls += ' techlead';
+    if (isChanged) cls += ' changed';
+    div.className = cls;
+    div.style.left = (p.x - minX + PAD) + 'px';
+    div.style.top = (p.y - minY + PAD) + 'px';
+    div.innerHTML = `
+      <div class="node-name">${name}</div>
+      <div class="node-role">${node.fn}</div>
+      ${isManager ? '<div class="node-badge"></div>' : ''}
+    `;
+
+    div.addEventListener('mouseenter', () => {
+      const numReports = (children[name] || []).length;
+      const changeNote = isChanged ? `<div class="tt-change">⚠ Changed in proposal</div>` : '';
+      tooltip.style.display = 'block';
+      tooltip.innerHTML = `
+        <div class="tt-name">${name}${isManager ? ' 🔴' : isTechLead ? ' 🟢' : ''}</div>
+        <div class="tt-row"><span>Function</span><span class="tt-val">${node.fn}</span></div>
+        <div class="tt-row"><span>Effort</span><span class="tt-val">${node.effort}</span></div>
+        ${isTechLead ? `<div class="tt-row"><span>Role</span><span class="tt-val" style="color:var(--green)">Tech Lead</span></div>` : ''}
+        <div class="tt-row"><span>Reports</span><span class="tt-val">${numReports}</span></div>
+        ${node.coach ? `<div class="tt-row"><span>Coach</span><span class="tt-val">${node.coach}</span></div>` : ''}
+        ${changeNote}
+      `;
+    });
+    div.addEventListener('mousemove', e => {
+      tooltip.style.left = (e.clientX + 14) + 'px';
+      tooltip.style.top = (e.clientY - 10) + 'px';
+    });
+    div.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+    canvasEl.appendChild(div);
+  });
+
+  // Unassigned (proposal only)
+  if (cfg.showUnassigned) {
+    const UNASSIGNED = cfg.RAW.filter(r => r.coach === null && r.name !== 'John');
+    function guessManager(node) {
+      const fn = node.fn;
+      if (fn === 'Visual Design')       return 'Chris';
+      if (fn === 'Product Management')  return 'Angela';
+      if (fn === 'Users')               return 'Hamish';
+      if (fn.startsWith('Operations'))  return 'Jessie';
+      if (fn.startsWith('Dev'))         return 'Russ';
+      if (fn === 'MLAD')                return 'Russ';
+      if (fn === 'Marketing')           return 'Grace Chen';
+      return null;
+    }
+    const byMgr = {};
+    UNASSIGNED.forEach(r => {
+      const mgr = guessManager(r);
+      if (!mgr) return;
+      if (!byMgr[mgr]) byMgr[mgr] = [];
+      byMgr[mgr].push(r);
+    });
+
+    function subtreeBounds(name) {
+      let bMinX = Infinity, bMaxX = -Infinity, bMaxY = -Infinity;
+      function walk(n) {
+        const p = positions[n]; if (!p) return;
+        const ax = p.x - minX + PAD, ay = p.y - minY + PAD;
+        bMinX = Math.min(bMinX, ax); bMaxX = Math.max(bMaxX, ax + NW);
+        bMaxY = Math.max(bMaxY, ay + NH);
+        (children[n] || []).forEach(walk);
+      }
+      walk(name);
+      return { minX: bMinX, maxX: bMaxX, maxY: bMaxY, centerX: (bMinX + bMaxX) / 2 };
+    }
+
+    Object.entries(byMgr).forEach(([mgr, people]) => {
+      const b = subtreeBounds(mgr);
+      const groupW = people.length * NW + (people.length - 1) * 10;
+      const startX = b.centerX - groupW / 2;
+      const startY = b.maxY + 32;
+
+      const lbl = document.createElement('div');
+      lbl.className = 'unassigned-label';
+      lbl.style.left = startX + 'px';
+      lbl.style.top = (startY - 16) + 'px';
+      lbl.textContent = 'unassigned';
+      canvasEl.appendChild(lbl);
+
+      people.forEach((person, i) => {
+        const el = document.createElement('div');
+        el.className = 'unassigned-node';
+        el.style.left = (startX + i * (NW + 10)) + 'px';
+        el.style.top = startY + 'px';
+        el.innerHTML = `<div class="node-name">${person.name}</div><div class="node-role">${person.fn}</div>`;
+        canvasEl.appendChild(el);
+      });
+    });
+  }
+
+  // Store for fitView
+  scene._totalW = totalW;
+  scene._totalH = totalH;
+}
+
+// ─── PAN & ZOOM ──────────────────────────────────────────────────────────────
+const wrap = document.getElementById('canvas-wrap');
+let scale = 1, tx = 40, ty = 20;
+let dragging = false, lastX, lastY;
+let targetScale = scale, targetTx = tx, targetTy = ty;
+let animating = false;
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+function animateFrame() {
+  const ease = 0.12;
+  scale = lerp(scale, targetScale, ease);
+  tx = lerp(tx, targetTx, ease);
+  ty = lerp(ty, targetTy, ease);
+  scene.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+  if (Math.abs(scale - targetScale) > 0.0005 || Math.abs(tx - targetTx) > 0.3 || Math.abs(ty - targetTy) > 0.3) {
+    requestAnimationFrame(animateFrame);
+  } else {
+    scale = targetScale; tx = targetTx; ty = targetTy;
+    scene.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+    animating = false;
+  }
+}
+
+function startAnim() { if (!animating) { animating = true; requestAnimationFrame(animateFrame); } }
+
+wrap.addEventListener('mousedown', e => { dragging = true; lastX = e.clientX; lastY = e.clientY; wrap.classList.add('dragging'); });
+window.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  const dx = e.clientX - lastX, dy = e.clientY - lastY;
+  tx += dx; ty += dy; targetTx += dx; targetTy += dy;
+  lastX = e.clientX; lastY = e.clientY;
+  scene.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+});
+window.addEventListener('mouseup', () => { dragging = false; wrap.classList.remove('dragging'); });
+
+wrap.addEventListener('wheel', e => {
+  e.preventDefault();
+  const zf = e.deltaY < 0 ? 1.08 : 0.93;
+  const rect = wrap.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const ns = Math.max(0.08, Math.min(3, targetScale * zf));
+  const sr = ns / targetScale;
+  targetTx = mx - (mx - targetTx) * sr;
+  targetTy = my - (my - targetTy) * sr;
+  targetScale = ns;
+  startAnim();
+}, { passive: false });
+
+function fitView() {
+  const ww = wrap.clientWidth, wh = wrap.clientHeight;
+  const tw = scene._totalW || 2000, th = scene._totalH || 2000;
+  const s = Math.min(ww / tw, wh / th) * 0.9;
+  targetScale = s;
+  targetTx = (ww - tw * s) / 2;
+  targetTy = (wh - th * s) / 2;
+  startAnim();
+}
+
+document.getElementById('btn-fit').addEventListener('click', fitView);
+document.getElementById('btn-in').addEventListener('click', () => {
+  const rect = wrap.getBoundingClientRect();
+  const mx = rect.width / 2, my = rect.height / 2;
+  const ns = Math.min(3, targetScale * 1.3), sr = ns / targetScale;
+  targetTx = mx - (mx - targetTx) * sr; targetTy = my - (my - targetTy) * sr;
+  targetScale = ns; startAnim();
+});
+document.getElementById('btn-out').addEventListener('click', () => {
+  const rect = wrap.getBoundingClientRect();
+  const mx = rect.width / 2, my = rect.height / 2;
+  const ns = Math.max(0.08, targetScale / 1.3), sr = ns / targetScale;
+  targetTx = mx - (mx - targetTx) * sr; targetTy = my - (my - targetTy) * sr;
+  targetScale = ns; startAnim();
+});
+
+// ─── SWITCHER ────────────────────────────────────────────────────────────────
+function switchView(viewKey) {
+  if (viewKey === currentView) return;
+  currentView = viewKey;
+
+  document.getElementById('btn-orig').classList.toggle('active', viewKey === 'orig');
+  document.getElementById('btn-prop').classList.toggle('active', viewKey === 'prop');
+  document.getElementById('badge-changes').classList.toggle('hidden', viewKey === 'orig');
+
+  // Close changes panel when switching to orig
+  if (viewKey === 'orig') document.getElementById('changes-panel').classList.remove('visible');
+
+  scene.classList.add('fading');
+  setTimeout(() => {
+    render(viewKey);
+    scene.classList.remove('fading');
+    fitView();
+  }, 180);
+}
+
+function toggleChangesPanel() {
+  document.getElementById('changes-panel').classList.toggle('visible');
+}
+
+    const link = document.createElement('a');
+    link.download = `org_chart_${currentView}.png`;
+    link.href = cvs.toDataURL('image/png');
+    link.click();
+  } catch(err) { alert('Export failed: ' + err.message); }
+  scene.style.transform = saved;
+  btn.textContent = '⬇ PNG';
+  btn.disabled = false;
+});
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+render('orig');
+setTimeout(fitView, 50);
+</script>
+</body>
+</html>
